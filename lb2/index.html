@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Code</title>
+</head>
+<body>
+<pre>
+breed [frogs frog]
+breed [snakes snake]
+frogs-own [struggle? poison savePoison cyclePoison]
+snakes-own [resistance saveResistance saveResistanceCount cycleResistance]
+
+to setup
+  clear-all
+  ask patches [ set pcolor white ]
+  set-default-shape frogs "frog top"
+  setup-individuals
+  reset-ticks
+end
+
+to setup-individuals
+  create-frogs initial-number-frogs
+  [
+    set size 1
+    set poison random-normal initial-poison-mean 1
+    setxy random-xcor random-ycor
+    set struggle? false
+    set color red
+    set savePoison 0
+    set cyclePoison 0
+  ]
+
+  create-snakes initial-number-snakes
+  [
+    set size 1
+    set resistance random-normal initial-resistance-mean 1
+    setxy random-xcor random-ycor
+    set color blue
+    set cycleResistance 0
+    set saveResistance 0
+    set saveResistanceCount 0
+  ]
+end
+
+to go
+  ask snakes [
+    if resistance < 0 [die]
+    rt random-float 50 - random-float 50
+    if any? frogs-here
+    [
+      hunt-frogs
+    ]
+    snake-position
+  ]
+
+  ask frogs [
+    if poison < 0 [die]
+    rt random-float 50 - random-float 50
+    fd 1
+    set struggle? false
+    change-poison
+  ]
+
+;; original global reproduction mechanism
+;;  while [count turtles < max-population] [
+;;    ifelse random 2 = 0 [
+;;      ask one-of snakes [ reproduce ]
+;;    ]
+;;    [
+;;      ask one-of frogs [ reproduce ]
+;;    ]
+;;  ]
+
+;; new individual-based reproduction mechanism
+  ask turtles [
+    if breed = frogs and count frogs < max-population / 2 and random 100 < 5 [
+      reproduce
+    ]
+    if breed = snakes and count snakes < max-population / 2 and random 100 < 5 [
+      reproduce
+    ]
+  ]
+
+  tick
+end
+
+to hunt-frogs
+  let hunted one-of (frogs-here with [not struggle?])
+  if hunted != nobody [
+    ask hunted [ set struggle? true ]
+    ifelse resistance > [ poison ] of hunted [
+      set resistance resistance + (initial-resistance-mean / 10) ;first task
+      set saveResistance resistance / [ poison ] of hunted       ;third task
+      set saveResistanceCount resistance / [ poison ] of hunted  ;third task
+      set cycleResistance 1                                      ;third task
+
+      ask hunted [ die ]
+    ]
+    [
+      if resistance != [ poison ] of hunted [
+        ask hunted [
+          set poison poison - (initial-poison-mean / 10)
+          set savePoison poison - (initial-poison-mean / 10)
+          set cyclePoison 1
+        ] ;second task
+
+        die
+      ]
+    ]
+  ]
+end
+
+to change-poison
+  if cyclePoison = 1 [
+    if poison > savePoison [
+      set cyclePoison 0
+    ]
+
+    if poison != savePoison [
+      set poison poison + (initial-poison-mean / 100)
+    ]
+  ]
+end ;second task
+
+to snake-position
+  if cycleResistance = 1 [
+    set saveResistance saveResistance + 1
+
+    if saveResistance > saveResistanceCount [
+      set cycleResistance 0
+    ]
+
+    fd 0
+  ]
+
+  if cycleResistance = 0 [
+    fd 1
+  ]
+end ;third task
+
+to reproduce
+ if breed = frogs [
+   hatch 1 [
+     set poison random-normal [ poison ] of myself 1
+   ]
+ ]
+ if breed = snakes [
+   hatch 1 [
+     set resistance random-normal [resistance] of myself 1
+   ]
+ ]
+end
+
+to-report average-poison
+  ifelse count frogs > 0
+    [ report mean [ poison ] of frogs ]
+    [ report 0 ]
+end
+
+to-report average-resistance
+  ifelse count snakes > 0
+    [ report mean [ resistance ] of snakes ]
+    [ report 0 ]
+end
+</pre>
+</body>
+</html>
